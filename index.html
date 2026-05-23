@@ -184,11 +184,11 @@
     <div class="section-label">心率 · 血氧 · 步数</div>
     <div class="grid-3">
       <div class="mini-card pink">
-        <input class="editable mini-num" id="heart-val" value="--" style="width:100%;text-align:center">
+        <input class="editable mini-num" id="heart-val" value="--" style="width:100%;text-align:center" oninput="saveDailyData('heart',this.value)">
         <div class="mini-unit">bpm</div><div class="mini-label">心率</div>
       </div>
       <div class="mini-card blue">
-        <input class="editable mini-num" id="oxygen-val" value="--" style="width:100%;text-align:center">
+        <input class="editable mini-num" id="oxygen-val" value="--" style="width:100%;text-align:center" oninput="saveDailyData('oxygen',this.value)">
         <div class="mini-unit">%</div><div class="mini-label">血氧</div>
       </div>
       <div class="mini-card green">
@@ -209,9 +209,9 @@
       </div>
       <div class="sleep-bar">
         <div>
-          <input class="editable sleep-time-val" id="sleep-start" value="--:--">
+          <input class="editable sleep-time-val" id="sleep-start" value="--:--" oninput="saveDailyData('sleepStart',this.value)">
           <span style="color:var(--text-light)"> → </span>
-          <input class="editable sleep-time-val" id="sleep-end" value="--:--">
+          <input class="editable sleep-time-val" id="sleep-end" value="--:--" oninput="saveDailyData('sleepEnd',this.value)">
         </div>
         <div class="sleep-tag" id="sleep-tag">未填</div>
       </div>
@@ -562,12 +562,28 @@ function addTodo(cat) {
 function toggleTodo(cat, i) { todos[cat][i].done = !todos[cat][i].done; saveTodos(); renderAllCats(); }
 function deleteTodo(cat, i) { todos[cat].splice(i,1); saveTodos(); renderAllCats(); }
 
+// ========== URL 参数导入（Apple Health 快捷指令） ==========
+function readUrlParams() {
+  const p = new URLSearchParams(window.location.search);
+  const map = {weight:'weight',steps:'steps',heart:'heart',spo2:'oxygen',sleep:'sleep',sleepStart:'sleepStart',sleepEnd:'sleepEnd'};
+  let hasData = false;
+  Object.entries(map).forEach(([param, key]) => {
+    const val = p.get(param);
+    if (val !== null) { saveDailyData(key, isNaN(val) ? val : Number(val)); hasData = true; }
+  });
+  if (hasData) history.replaceState({}, '', window.location.pathname);
+}
+
 // ========== 恢复状态 ==========
 function restoreToday() {
   const d = getDailyData(todayStr);
   if (d.weight) { document.getElementById('weight-val').value = d.weight; updateWeight(); }
   if (d.steps) { document.getElementById('steps-val').value = d.steps; updateSteps(); }
   if (d.sleep) { document.getElementById('sleep-val').value = d.sleep; updateSleep(); }
+  if (d.heart) document.getElementById('heart-val').value = d.heart;
+  if (d.oxygen) document.getElementById('oxygen-val').value = d.oxygen;
+  if (d.sleepStart) document.getElementById('sleep-start').value = d.sleepStart;
+  if (d.sleepEnd) document.getElementById('sleep-end').value = d.sleepEnd;
   if (d.mood) document.querySelectorAll('.mood-btn').forEach(b=>{ if(b.textContent===d.mood) b.classList.add('active'); });
   if (d.phase) document.querySelectorAll('.phase-chip').forEach(c=>{ if(c.textContent===d.phase) c.classList.add('active'); });
 }
@@ -579,6 +595,7 @@ if (ps.lastPeriodDate) {
   updatePeriodPredict();
 }
 
+readUrlParams();
 restoreToday();
 renderCal();
 renderAllCats();
