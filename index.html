@@ -109,13 +109,12 @@
     .cal-nav { width:28px; height:28px; border-radius:8px; border:none; background:var(--bg); cursor:pointer; font-size:14px; color:var(--text); }
     .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
     .cal-weekday { text-align:center; font-size:9px; letter-spacing:.05em; color:var(--text-light); padding-bottom:4px; text-transform:uppercase; }
-    .cal-day { aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; cursor:pointer; position:relative; }
+    .cal-day { aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; position:relative; }
     .cal-day-num { font-size:clamp(10px, 2.8vw, 13px); font-weight:500; color:var(--text-dark); line-height:1; }
     .cal-day.today .cal-day-num { font-weight:800; color:var(--pink); }
     .cal-day.today { border:1.5px solid var(--pink); }
     .cal-day.other-month .cal-day-num { color:var(--text-light); opacity:.4; }
-    .cal-mood { font-size:clamp(7px, 2vw, 10px); line-height:1; }
-    .cal-phase-dot { width:clamp(3px, 1vw, 5px); height:clamp(3px, 1vw, 5px); border-radius:50%; }
+    .cal-mood { font-size:clamp(10px, 3vw, 14px); line-height:1; }
 
     /* SCREEN */
     .screen-big { font-size:38px; font-weight:700; color:var(--text-dark); letter-spacing:-1px; text-align:center; display:block; width:100%; }
@@ -531,10 +530,9 @@ function renderCal() {
     const phaseColor = daily.phase ? getPhaseColor(daily.phase) : (autoPhase ? autoPhase.color : 'transparent');
 
     daysEl.innerHTML += `
-      <div class="cal-day${isToday?' today':''}" style="background:${phaseColor !== 'transparent' ? phaseColor+'22' : ''}">
+      <div class="cal-day${isToday?' today':''}" style="background:${phaseColor !== 'transparent' ? phaseColor+'55' : ''}">
         <div class="cal-day-num">${d}</div>
-        ${daily.mood ? `<div class="cal-mood">${daily.mood}</div>` : '<div class="cal-mood" style="height:9px"></div>'}
-        <div class="cal-phase-dot" style="background:${phaseColor}"></div>
+        ${daily.mood ? `<div class="cal-mood">${daily.mood}</div>` : ''}
       </div>`;
   }
 
