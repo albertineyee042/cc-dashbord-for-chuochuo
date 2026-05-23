@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>戳戳监控台</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    :root {
+      --bg:#f7f3f0; --card:#fff;
+      --pink:#e8b4bc; --pink-soft:#f5dde2;
+      --blue:#a8c4d4; --blue-soft:#dceef7;
+      --green:#a8c9b8; --green-soft:#d8eed6;
+      --purple:#c4b0d4; --purple-soft:#e8e0f0;
+      --orange:#e8c9a0; --orange-soft:#f5e8d0;
+      --text:#5a5058; --text-light:#9a9098; --text-dark:#3a3038;
+    }
+    body { background:#ede8e4; font-family:-apple-system,'PingFang SC',sans-serif; color:var(--text); height:100dvh; display:flex; justify-content:center; overflow:hidden; }
+    .app-shell { background:var(--bg); width:100%; max-width:480px; height:100dvh; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+
+    /* 顶部 */
+    .topbar { padding:16px 20px 8px; display:flex; justify-content:space-between; align-items:flex-end; flex-shrink:0; }
+    .topbar-title { font-size:11px; letter-spacing:.2em; color:var(--text-light); text-transform:uppercase; }
+    .topbar-date { font-size:20px; font-weight:700; color:var(--text-dark); margin-top:2px; }
+    .live-badge { display:flex; align-items:center; gap:5px; font-size:11px; letter-spacing:.1em; color:var(--pink); }
+    .live-dot { width:7px; height:7px; border-radius:50%; background:var(--pink); animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* 页面 */
+    .pages { flex:1; overflow:hidden; position:relative; }
+    .page { position:absolute; inset:0; overflow-y:auto; padding:6px 14px 24px; opacity:0; transform:translateX(30px); transition:all .25s ease; pointer-events:none; }
+    .page.active { opacity:1; transform:translateX(0); pointer-events:all; }
+    .page.exit { opacity:0; transform:translateX(-30px); }
+
+    /* 底部导航 */
+    .navbar { display:flex; background:var(--card); border-top:1px solid rgba(0,0,0,.05); padding:10px 0 24px; flex-shrink:0; }
+    .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; padding:4px 0; }
+    .nav-icon { font-size:20px; color:var(--text-light); transition:all .2s; line-height:1; }
+    .nav-label { font-size:10px; letter-spacing:.1em; color:var(--text-light); text-transform:uppercase; transition:color .2s; }
+    .nav-item.active .nav-label { color:var(--pink); font-weight:600; }
+    .nav-item.active .nav-icon { color:var(--pink); transform:scale(1.15); }
+
+    /* 通用 */
+    .card { background:var(--card); border-radius:18px; padding:16px; margin-bottom:10px; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+    .section-label { font-size:10px; letter-spacing:.2em; color:var(--text-light); text-transform:uppercase; margin:14px 0 6px 2px; }
+    .editable { border:none; background:transparent; font-size:inherit; font-weight:inherit; color:inherit; font-family:inherit; outline:none; }
+    .editable:focus { border-bottom:1.5px dashed var(--pink); }
+
+    /* 数值显示 */
+    .val-row { display:flex; align-items:baseline; gap:4px; }
+    .big-num { font-size:48px; font-weight:700; color:var(--text-dark); line-height:1; letter-spacing:-2px; width:auto; min-width:60px; }
+    .big-unit { font-size:14px; color:var(--text-light); }
+    .sub-text { font-size:12px; color:var(--text-light); margin-top:4px; }
+
+    /* 三格 */
+    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px; }
+    .mini-card { border-radius:16px; padding:12px 8px; text-align:center; }
+    .mini-card.pink{background:var(--pink-soft)} .mini-card.blue{background:var(--blue-soft)} .mini-card.green{background:var(--green-soft)} .mini-card.purple{background:var(--purple-soft)}
+    .mini-num { font-size:22px; font-weight:700; color:var(--text-dark); width:100%; text-align:center; }
+    .mini-unit { font-size:10px; color:var(--text-light); }
+    .mini-label { font-size:9px; letter-spacing:.08em; color:var(--text-light); text-transform:uppercase; }
+
+    /* 步数 */
+    .prog-info { display:flex; justify-content:space-between; font-size:11px; color:var(--text-light); margin-bottom:5px; }
+    .prog-bar { height:7px; background:var(--green-soft); border-radius:10px; overflow:hidden; }
+    .prog-fill { height:100%; background:var(--green); border-radius:10px; transition:width .5s; }
+
+    /* 睡眠 */
+    .sleep-bar { background:var(--blue-soft); border-radius:12px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+    .sleep-time-val { font-size:15px; font-weight:600; color:var(--text-dark); width:48px; }
+    .sleep-tag { font-size:11px; padding:3px 10px; border-radius:20px; background:var(--blue); color:white; }
+    .sleep-tag.warn{background:var(--pink)} .sleep-tag.good{background:var(--green)}
+
+    /* 心情 */
+    .mood-row { display:flex; gap:6px; }
+    .mood-btn { flex:1; padding:8px 0; border:none; border-radius:12px; background:var(--bg); font-size:18px; cursor:pointer; transition:all .2s; }
+    .mood-btn.active { background:var(--pink-soft); transform:scale(1.1); }
+
+    /* 经期 */
+    .period-phases { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+    .phase-chip { padding:5px 11px; border-radius:20px; font-size:11px; border:1.5px solid transparent; cursor:pointer; transition:all .2s; }
+    .phase-chip.p1 { border-color:var(--pink); color:var(--pink); }
+    .phase-chip.p1.active { background:var(--pink-soft); font-weight:600; }
+    .phase-chip.p2 { border-color:var(--green); color:var(--green); }
+    .phase-chip.p2.active { background:var(--green-soft); font-weight:600; }
+    .phase-chip.p3 { border-color:var(--purple); color:var(--purple); }
+    .phase-chip.p3.active { background:var(--purple-soft); font-weight:600; }
+    .phase-chip.p4 { border-color:var(--blue); color:var(--blue); }
+    .phase-chip.p4.active { background:var(--blue-soft); font-weight:600; }
+    .phase-chip.p5 { border-color:var(--orange); color:#b89060; }
+    .phase-chip.p5.active { background:var(--orange-soft); font-weight:600; }
+
+    .period-inputs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+    .period-input-box { background:var(--bg); border-radius:12px; padding:10px 12px; }
+    .period-input-label { font-size:10px; letter-spacing:.08em; color:var(--text-light); text-transform:uppercase; margin-bottom:4px; }
+    .period-input-val { font-size:15px; font-weight:600; color:var(--text-dark); width:100%; border:none; background:transparent; outline:none; font-family:inherit; }
+
+    .period-predict { background:var(--pink-soft); border-radius:12px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; }
+    .predict-label { font-size:10px; letter-spacing:.08em; color:var(--text-light); text-transform:uppercase; }
+    .predict-val { font-size:16px; font-weight:700; color:var(--text-dark); }
+    .predict-days { font-size:22px; font-weight:700; color:var(--pink); }
+
+    /* 日历 */
+    .cal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .cal-month { font-size:14px; font-weight:600; color:var(--text-dark); }
+    .cal-nav { width:28px; height:28px; border-radius:8px; border:none; background:var(--bg); cursor:pointer; font-size:14px; color:var(--text); }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+    .cal-weekday { text-align:center; font-size:9px; letter-spacing:.05em; color:var(--text-light); padding-bottom:4px; text-transform:uppercase; }
+    .cal-day { aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; cursor:pointer; position:relative; }
+    .cal-day-num { font-size:clamp(10px, 2.8vw, 13px); font-weight:500; color:var(--text-dark); line-height:1; }
+    .cal-day.today .cal-day-num { font-weight:800; color:var(--pink); }
+    .cal-day.today { border:1.5px solid var(--pink); }
+    .cal-day.other-month .cal-day-num { color:var(--text-light); opacity:.4; }
+    .cal-mood { font-size:clamp(7px, 2vw, 10px); line-height:1; }
+    .cal-phase-dot { width:clamp(3px, 1vw, 5px); height:clamp(3px, 1vw, 5px); border-radius:50%; }
+
+    /* SCREEN */
+    .screen-big { font-size:38px; font-weight:700; color:var(--text-dark); letter-spacing:-1px; text-align:center; display:block; width:100%; }
+    .screen-sub { text-align:center; font-size:10px; letter-spacing:.15em; color:var(--text-light); text-transform:uppercase; margin-bottom:14px; }
+    .app-row { margin-bottom:12px; }
+    .app-top { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+    .app-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .app-name-in { font-size:14px; color:var(--text-dark); flex:1; border:none; background:transparent; outline:none; font-family:inherit; }
+    .app-time-in { font-size:13px; font-weight:600; color:var(--text-dark); text-align:right; width:76px; border:none; background:transparent; outline:none; font-family:inherit; }
+    .app-bar-bg { height:5px; background:var(--bg); border-radius:4px; overflow:hidden; margin-left:16px; }
+    .app-bar-fill { height:100%; border-radius:4px; }
+
+    /* TODAY 分类 */
+    /* TODAY 分类板块 */
+    .cat-section { margin-bottom:10px; }
+    .cat-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; padding:0 2px; }
+    .cat-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    .cat-title { font-size:11px; letter-spacing:.15em; color:var(--text-light); text-transform:uppercase; font-weight:600; }
+
+    .todo-input-wrap { display:flex; gap:8px; margin-bottom:12px; }
+    .todo-input { flex:1; padding:9px 13px; border-radius:12px; border:1.5px solid var(--pink-soft); font-size:14px; color:var(--text-dark); background:var(--bg); outline:none; font-family:inherit; }
+    .todo-input:focus { border-color:var(--pink); }
+    .add-btn { width:40px; height:40px; border-radius:12px; border:none; background:var(--pink); color:white; font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+    .todo-item { display:flex; align-items:center; gap:9px; padding:9px 0; border-bottom:1px solid var(--bg); }
+    .todo-check { width:20px; height:20px; border-radius:6px; border:1.5px solid var(--pink); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+    .todo-check.done { background:var(--pink); border-color:var(--pink); }
+    .todo-check.done::after { content:'✓'; color:white; font-size:11px; }
+    .todo-text { font-size:14px; color:var(--text-dark); flex:1; }
+    .todo-text.done { text-decoration:line-through; color:var(--text-light); }
+    .todo-del { color:var(--text-light); cursor:pointer; font-size:16px; padding:0 3px; }
+
+    .done-title { font-size:10px; letter-spacing:.15em; color:var(--text-light); text-transform:uppercase; margin:14px 0 6px; }
+    .empty-hint { font-size:13px; color:var(--text-light); text-align:center; padding:10px 0; }
+
+    /* 页脚 */
+    .page-footer { text-align:center; font-size:10px; letter-spacing:.12em; color:var(--text-light); margin-top:20px; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">戳戳监控台</div>
+    <div class="topbar-date" id="today-date"></div>
+  </div>
+  <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+</div>
+
+<div class="pages">
+
+  <!-- ===== PAGE 1: VITALS ===== -->
+  <div class="page active" id="page-vitals">
+
+    <div class="section-label">体重</div>
+    <div class="card">
+      <div class="val-row">
+        <input class="editable big-num" id="weight-val" value="59.3" oninput="updateWeight()" style="width:110px">
+        <span class="big-unit">kg</span>
+        <span id="weight-arrow" style="font-size:13px;margin-left:8px"></span>
+      </div>
+      <div class="sub-text">目标 55kg · 还差 <span id="weight-gap">4.3</span>kg</div>
+    </div>
+
+    <div class="section-label">心率 · 血氧 · 步数</div>
+    <div class="grid-3">
+      <div class="mini-card pink">
+        <input class="editable mini-num" id="heart-val" value="--" style="width:100%;text-align:center">
+        <div class="mini-unit">bpm</div><div class="mini-label">心率</div>
+      </div>
+      <div class="mini-card blue">
+        <input class="editable mini-num" id="oxygen-val" value="--" style="width:100%;text-align:center">
+        <div class="mini-unit">%</div><div class="mini-label">血氧</div>
+      </div>
+      <div class="mini-card green">
+        <input class="editable mini-num" id="steps-val" value="0" style="width:100%;text-align:center" oninput="updateSteps()">
+        <div class="mini-unit">步</div><div class="mini-label">步数</div>
+      </div>
+    </div>
+    <div class="card" style="padding:12px 16px">
+      <div class="prog-info"><span id="steps-text">0 步 / 10,000</span><span id="steps-pct">0%</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="steps-bar" style="width:0%"></div></div>
+    </div>
+
+    <div class="section-label">睡眠</div>
+    <div class="card">
+      <div class="val-row">
+        <input class="editable big-num" id="sleep-val" value="--" style="width:80px" oninput="updateSleep()">
+        <span class="big-unit">h</span>
+      </div>
+      <div class="sleep-bar">
+        <div>
+          <input class="editable sleep-time-val" id="sleep-start" value="--:--">
+          <span style="color:var(--text-light)"> → </span>
+          <input class="editable sleep-time-val" id="sleep-end" value="--:--">
+        </div>
+        <div class="sleep-tag" id="sleep-tag">未填</div>
+      </div>
+    </div>
+
+    <div class="section-label">心情</div>
+    <div class="card">
+      <div class="mood-row">
+        <button class="mood-btn" onclick="setMood(this)">😴</button>
+        <button class="mood-btn" onclick="setMood(this)">😔</button>
+        <button class="mood-btn" onclick="setMood(this)">😐</button>
+        <button class="mood-btn" onclick="setMood(this)">🙂</button>
+        <button class="mood-btn" onclick="setMood(this)">😄</button>
+      </div>
+    </div>
+
+    <div class="section-label">经期</div>
+    <div class="card">
+      <div class="period-phases">
+        <div class="phase-chip p1" onclick="setPhase(this)">月经期</div>
+        <div class="phase-chip p2" onclick="setPhase(this)">卵泡期</div>
+        <div class="phase-chip p3" onclick="setPhase(this)">排卵期</div>
+        <div class="phase-chip p4" onclick="setPhase(this)">黄体期</div>
+        <div class="phase-chip p5" onclick="setPhase(this)">经前期</div>
+      </div>
+      <div class="period-inputs">
+        <div class="period-input-box">
+          <div class="period-input-label">上次月经</div>
+          <input class="period-input-val" type="date" id="last-period" oninput="updatePeriodPredict()">
+        </div>
+        <div class="period-input-box">
+          <div class="period-input-label">周期天数</div>
+          <input class="period-input-val" type="number" id="cycle-len" value="28" min="21" max="40" oninput="updatePeriodPredict()">
+        </div>
+      </div>
+      <div class="period-predict">
+        <div>
+          <div class="predict-label">下次月经预测</div>
+          <div class="predict-val" id="next-period-date">填入日期后显示</div>
+        </div>
+        <div style="text-align:right">
+          <div class="predict-days" id="next-period-days">--</div>
+          <div class="predict-label">天后</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">月历</div>
+    <div class="card">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+        <div class="cal-month" id="cal-month-title"></div>
+        <button class="cal-nav" onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="cal-grid" id="cal-weekdays"></div>
+      <div class="cal-grid" id="cal-days"></div>
+    </div>
+
+    <div class="page-footer">晏珠♥德尼</div>
+  </div>
+
+  <!-- ===== PAGE 2: SCREEN ===== -->
+  <div class="page" id="page-screen">
+    <div class="section-label">今日屏幕时间</div>
+    <div class="card">
+      <input class="editable screen-big" id="screen-total" value="-- h -- m">
+      <div class="screen-sub">total today</div>
+      <div id="app-list">
+        <div class="app-row">
+          <div class="app-top">
+            <div class="app-dot" style="background:var(--pink)"></div>
+            <input class="app-name-in" value="小红书">
+            <input class="app-time-in" value="-- h --m">
+          </div>
+          <div class="app-bar-bg"><div class="app-bar-fill" style="width:75%;background:var(--pink)"></div></div>
+        </div>
+        <div class="app-row">
+          <div class="app-top">
+            <div class="app-dot" style="background:var(--blue)"></div>
+            <input class="app-name-in" value="微信">
+            <input class="app-time-in" value="-- h --m">
+          </div>
+          <div class="app-bar-bg"><div class="app-bar-fill" style="width:55%;background:var(--blue)"></div></div>
+        </div>
+        <div class="app-row">
+          <div class="app-top">
+            <div class="app-dot" style="background:var(--purple)"></div>
+            <input class="app-name-in" value="Claude">
+            <input class="app-time-in" value="-- h --m">
+          </div>
+          <div class="app-bar-bg"><div class="app-bar-fill" style="width:38%;background:var(--purple)"></div></div>
+        </div>
+        <div class="app-row">
+          <div class="app-top">
+            <div class="app-dot" style="background:var(--green)"></div>
+            <input class="app-name-in" value="其他">
+            <input class="app-time-in" value="-- h --m">
+          </div>
+          <div class="app-bar-bg"><div class="app-bar-fill" style="width:20%;background:var(--green)"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="page-footer" style="margin-top:30px">晏珠♥德尼</div>
+  </div>
+
+  <!-- ===== PAGE 3: TODAY ===== -->
+  <div class="page" id="page-today">
+    <div id="cat-sections"></div>
+    <div class="page-footer" style="margin-top:20px">晏珠♥德尼</div>
+  </div>
+
+</div>
+
+<!-- 底部导航 -->
+<div class="navbar">
+  <div class="nav-item active" onclick="switchTab('vitals',this)">
+    <div class="nav-icon">◎</div>
+    <div class="nav-label">Vitals</div>
+  </div>
+  <div class="nav-item" onclick="switchTab('screen',this)">
+    <div class="nav-icon">▢</div>
+    <div class="nav-label">Screen</div>
+  </div>
+  <div class="nav-item" onclick="switchTab('today',this)">
+    <div class="nav-icon">✦</div>
+    <div class="nav-label">Today</div>
+  </div>
+</div>
+
+<script>
+const TODAY = new Date();
+const todayStr = TODAY.toISOString().slice(0,10);
+
+// 日期显示
+document.getElementById('today-date').textContent = TODAY.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'});
+
+// Tab切换
+function switchTab(name, el) {
+  document.querySelectorAll('.page').forEach(p=>{ p.classList.remove('active'); p.classList.add('exit'); setTimeout(()=>p.classList.remove('exit'),300); });
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ========== VITALS ==========
+
+// 体重
+function updateWeight() {
+  const v = parseFloat(document.getElementById('weight-val').value);
+  if (!isNaN(v)) {
+    document.getElementById('weight-gap').textContent = Math.max(0, v-55).toFixed(1);
+    saveDailyData('weight', v);
+  }
+}
+updateWeight();
+
+// 步数
+function updateSteps() {
+  const v = parseInt(document.getElementById('steps-val').value)||0;
+  const pct = Math.min(100,Math.round(v/10000*100));
+  document.getElementById('steps-bar').style.width = pct+'%';
+  document.getElementById('steps-text').textContent = v.toLocaleString()+' 步 / 10,000';
+  document.getElementById('steps-pct').textContent = pct+'%';
+  saveDailyData('steps', v);
+}
+
+// 睡眠
+function updateSleep() {
+  const v = parseFloat(document.getElementById('sleep-val').value);
+  const tag = document.getElementById('sleep-tag');
+  if (isNaN(v)) { tag.textContent='未填'; tag.className='sleep-tag'; return; }
+  if (v>=7) { tag.textContent='睡眠充足'; tag.className='sleep-tag good'; }
+  else if (v>=5) { tag.textContent='睡眠不足'; tag.className='sleep-tag warn'; }
+  else { tag.textContent='严重不足'; tag.className='sleep-tag warn'; }
+  saveDailyData('sleep', v);
+}
+
+// 心情
+function setMood(btn) {
+  document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  saveDailyData('mood', btn.textContent);
+  renderCal();
+}
+
+// 经期分期
+function setPhase(chip) {
+  document.querySelectorAll('.phase-chip').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active');
+  saveDailyData('phase', chip.textContent);
+  renderCal();
+}
+
+// 经期预测
+function updatePeriodPredict() {
+  const last = document.getElementById('last-period').value;
+  const cycle = parseInt(document.getElementById('cycle-len').value)||28;
+  if (!last) return;
+  localStorage.setItem('periodSettings', JSON.stringify({lastPeriodDate:last, cycleLength:cycle}));
+  const lastDate = new Date(last);
+  const nextDate = new Date(lastDate.getTime() + cycle*24*60*60*1000);
+  const diff = Math.round((nextDate - TODAY) / (24*60*60*1000));
+  document.getElementById('next-period-date').textContent = nextDate.toLocaleDateString('zh-CN',{month:'long',day:'numeric'});
+  document.getElementById('next-period-days').textContent = diff > 0 ? diff : '已到';
+  renderCal();
+}
+
+// 获取某天的经期分期（基于设置自动计算）
+function getAutoPhase(dateStr) {
+  const settings = JSON.parse(localStorage.getItem('periodSettings')||'{}');
+  if (!settings.lastPeriodDate) return null;
+  const cycle = settings.cycleLength || 28;
+  const lastDate = new Date(settings.lastPeriodDate);
+  const targetDate = new Date(dateStr);
+  let diff = Math.round((targetDate - lastDate) / (24*60*60*1000));
+  diff = ((diff % cycle) + cycle) % cycle;
+  const day = diff + 1;
+  if (day <= 5) return {phase:'月经期', color:'var(--pink)'};
+  if (day <= 12) return {phase:'卵泡期', color:'var(--green)'};
+  if (day <= 16) return {phase:'排卵期', color:'var(--purple)'};
+  if (day <= cycle-5) return {phase:'黄体期', color:'var(--blue)'};
+  return {phase:'经前期', color:'var(--orange)'};
+}
+
+// ========== 日历 ==========
+let calYear = TODAY.getFullYear();
+let calMonth = TODAY.getMonth();
+
+function changeMonth(dir) { calMonth += dir; if(calMonth>11){calMonth=0;calYear++;} if(calMonth<0){calMonth=11;calYear--;} renderCal(); }
+
+function renderCal() {
+  const weekdays = ['日','一','二','三','四','五','六'];
+  const wdEl = document.getElementById('cal-weekdays');
+  wdEl.innerHTML = weekdays.map(d=>`<div class="cal-weekday">${d}</div>`).join('');
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev = new Date(calYear, calMonth, 0).getDate();
+
+  document.getElementById('cal-month-title').textContent = `${calYear}年${calMonth+1}月`;
+
+  const daysEl = document.getElementById('cal-days');
+  daysEl.innerHTML = '';
+
+  // 上月补位
+  for (let i=firstDay-1; i>=0; i--) {
+    const d = daysInPrev - i;
+    daysEl.innerHTML += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
+  }
+
+  // 本月
+  for (let d=1; d<=daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const daily = getDailyData(dateStr);
+    const isToday = dateStr === todayStr;
+    const autoPhase = getAutoPhase(dateStr);
+    const phaseColor = daily.phase ? getPhaseColor(daily.phase) : (autoPhase ? autoPhase.color : 'transparent');
+
+    daysEl.innerHTML += `
+      <div class="cal-day${isToday?' today':''}" style="background:${phaseColor !== 'transparent' ? phaseColor+'22' : ''}">
+        <div class="cal-day-num">${d}</div>
+        ${daily.mood ? `<div class="cal-mood">${daily.mood}</div>` : '<div class="cal-mood" style="height:9px"></div>'}
+        <div class="cal-phase-dot" style="background:${phaseColor}"></div>
+      </div>`;
+  }
+
+  // 下月补位
+  const total = firstDay + daysInMonth;
+  const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d=1; d<=remaining; d++) {
+    daysEl.innerHTML += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
+  }
+}
+
+function getPhaseColor(phase) {
+  const map = {'月经期':'var(--pink)','卵泡期':'var(--green)','排卵期':'var(--purple)','黄体期':'var(--blue)','经前期':'var(--orange)'};
+  return map[phase] || 'transparent';
+}
+
+// ========== 数据存取 ==========
+function getDailyData(dateStr) {
+  const all = JSON.parse(localStorage.getItem('dailyData')||'{}');
+  return all[dateStr] || {};
+}
+
+function saveDailyData(key, val) {
+  const all = JSON.parse(localStorage.getItem('dailyData')||'{}');
+  if (!all[todayStr]) all[todayStr] = {};
+  all[todayStr][key] = val;
+  localStorage.setItem('dailyData', JSON.stringify(all));
+}
+
+// ========== TODAY 分类 ==========
+const CATS = [
+  { name:'生活', color:'var(--green)' },
+  { name:'学习', color:'var(--blue)' },
+  { name:'读书', color:'var(--purple)' },
+  { name:'采购', color:'var(--orange)' },
+  { name:'代码', color:'var(--pink)' },
+];
+let todos = JSON.parse(localStorage.getItem('todosV2')||'{}');
+CATS.forEach(c=>{ if(!todos[c.name]) todos[c.name]=[]; });
+
+function saveTodos() { localStorage.setItem('todosV2', JSON.stringify(todos)); }
+
+function renderAllCats() {
+  const container = document.getElementById('cat-sections');
+  container.innerHTML = '';
+  CATS.forEach(cat => {
+    const items = todos[cat.name] || [];
+    const pendingHtml = items.filter(t=>!t.done).map((t,_)=>{
+      const i = todos[cat.name].indexOf(t);
+      return `<div class="todo-item"><div class="todo-check" onclick="toggleTodo('${cat.name}',${i})"></div><div class="todo-text">${t.text}</div><div class="todo-del" onclick="deleteTodo('${cat.name}',${i})">×</div></div>`;
+    }).join('');
+    const doneHtml = items.filter(t=>t.done).map((t,_)=>{
+      const i = todos[cat.name].indexOf(t);
+      return `<div class="todo-item"><div class="todo-check done" onclick="toggleTodo('${cat.name}',${i})"></div><div class="todo-text done">${t.text}</div><div class="todo-del" onclick="deleteTodo('${cat.name}',${i})">×</div></div>`;
+    }).join('');
+
+    container.innerHTML += `
+      <div class="cat-section">
+        <div class="cat-header">
+          <div class="cat-dot" style="background:${cat.color}"></div>
+          <div class="cat-title">${cat.name}</div>
+        </div>
+        <div class="card">
+          <div class="todo-input-wrap">
+            <input class="todo-input" id="input-${cat.name}" placeholder="添加${cat.name}事项..." onkeydown="if(event.key==='Enter')addTodo('${cat.name}')">
+            <button class="add-btn" style="background:${cat.color}" onclick="addTodo('${cat.name}')">+</button>
+          </div>
+          <div id="pending-${cat.name}">${pendingHtml}</div>
+          ${doneHtml ? `<div style="height:1px;background:var(--bg);margin:4px 0"></div>${doneHtml}` : ''}
+        </div>
+      </div>`;
+  });
+}
+
+function addTodo(cat) {
+  const input = document.getElementById('input-'+cat);
+  const text = input.value.trim();
+  if (!text) return;
+  todos[cat].unshift({text, done:false});
+  input.value = '';
+  saveTodos();
+  renderAllCats();
+}
+
+function toggleTodo(cat, i) { todos[cat][i].done = !todos[cat][i].done; saveTodos(); renderAllCats(); }
+function deleteTodo(cat, i) { todos[cat].splice(i,1); saveTodos(); renderAllCats(); }
+
+// ========== 恢复状态 ==========
+function restoreToday() {
+  const d = getDailyData(todayStr);
+  if (d.weight) { document.getElementById('weight-val').value = d.weight; updateWeight(); }
+  if (d.steps) { document.getElementById('steps-val').value = d.steps; updateSteps(); }
+  if (d.sleep) { document.getElementById('sleep-val').value = d.sleep; updateSleep(); }
+  if (d.mood) document.querySelectorAll('.mood-btn').forEach(b=>{ if(b.textContent===d.mood) b.classList.add('active'); });
+  if (d.phase) document.querySelectorAll('.phase-chip').forEach(c=>{ if(c.textContent===d.phase) c.classList.add('active'); });
+}
+
+const ps = JSON.parse(localStorage.getItem('periodSettings')||'{}');
+if (ps.lastPeriodDate) {
+  document.getElementById('last-period').value = ps.lastPeriodDate;
+  document.getElementById('cycle-len').value = ps.cycleLength || 28;
+  updatePeriodPredict();
+}
+
+restoreToday();
+renderCal();
+renderAllCats();
+</script>
+</div>
+</body>
+</html>
