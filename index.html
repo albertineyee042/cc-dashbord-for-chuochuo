@@ -855,8 +855,14 @@ async function syncToNotion() {
     btn.textContent = '写入Notion...';
     const dailyChildren = [
       {type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:`体重 ${d.weight||'--'}kg · 步数 ${d.steps||'--'} · 睡眠 ${d.sleep||'--'}h · 心情 ${mood} · 经期 ${phase}`}}]}},
-      ...(doneLines.length?[{type:'toggle',toggle:{rich_text:[{type:'text',text:{content:'✅ 今日完成'},annotations:{bold:true}}],children:doneLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))}}]:[]),
-      ...(pendingLines.length?[{type:'toggle',toggle:{rich_text:[{type:'text',text:{content:'📝 未完成'},annotations:{bold:true}}],children:pendingLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))}}]:[]),
+      ...(doneLines.length?[
+        {type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:'✅ 今日完成'},annotations:{bold:true}}]}},
+        ...doneLines.map(l=>({type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:'  · '+l}}]}}))
+      ]:[]),
+      ...(pendingLines.length?[
+        {type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:'📝 未完成'},annotations:{bold:true}}]}},
+        ...pendingLines.map(l=>({type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:'  · '+l}}]}}))
+      ]:[]),
       {type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:'💌 '+message},annotations:{italic:true,color:'pink'}}]}}
     ];
 
