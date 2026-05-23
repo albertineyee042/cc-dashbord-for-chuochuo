@@ -153,6 +153,9 @@
     .todo-ts { font-size:10px; color:var(--text-light); margin-left:6px; }
     .notion-sync-btn { width:100%; padding:12px; border-radius:14px; border:none; background:var(--purple-soft); color:var(--purple); font-size:13px; font-weight:600; cursor:pointer; margin-top:8px; letter-spacing:.05em; }
     .notion-sync-btn:active { opacity:.7; }
+    .screen-upload-btn { display:block; width:100%; padding:12px; border-radius:14px; border:none; background:var(--blue-soft); color:var(--blue); font-size:13px; font-weight:600; cursor:pointer; margin-top:10px; letter-spacing:.05em; text-align:center; }
+    .screen-upload-btn:active { opacity:.7; }
+    .screen-parse-status { text-align:center; font-size:12px; color:var(--text-light); margin-top:8px; min-height:18px; }
 
     /* 页脚 */
     .page-footer { text-align:center; font-size:10px; letter-spacing:.12em; color:var(--text-light); margin-top:20px; }
@@ -312,7 +315,12 @@
       <div class="screen-sub">total today</div>
       <div id="app-list" style="margin-top:12px"></div>
     </div>
-    <div class="page-footer" style="margin-top:30px">晏珠♥德尼</div>
+    <label class="screen-upload-btn" for="screen-img-input">
+      截图解析
+      <input type="file" id="screen-img-input" accept="image/*" style="display:none" onchange="parseScreenshot(this)">
+    </label>
+    <div class="screen-parse-status" id="screen-parse-status"></div>
+    <div class="page-footer" style="margin-top:20px">晏珠♥德尼</div>
   </div>
 
   <!-- ===== PAGE 3: TODAY ===== -->
@@ -650,6 +658,49 @@ function renderScreen() {
       <div class="app-bar-bg"><div class="app-bar-fill" style="width:${pct}%;background:${color}"></div></div>
     </div>`;
   }).join('');
+}
+
+// ========== 截图解析屏幕时间 ==========
+async function parseScreenshot(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
+  if (!cfg.key) { alert('请先在聊天设置里填写 API Key'); return; }
+  const status = document.getElementById('screen-parse-status');
+  status.textContent = '识别中...';
+  try {
+    const base64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result.split(',')[1]);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+    const resp = await fetch(WORKER_URL + '/parse-screen', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({imageBase64: base64, glmKey: cfg.key})
+    });
+    const data = await resp.json();
+    let content = data.choices?.[0]?.message?.content || '';
+    content = content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const parsed = JSON.parse(content);
+    const apps = parsed.apps || [];
+    const fmtMin = m => { const h=Math.floor(m/60),mn=m%60; return h>0?`${h}h ${mn}m`:`${mn}m`; };
+    const totalMin = apps.reduce((s,a)=>s+(a.minutes||0),0);
+    const screenData = {
+      total: (totalMin/60).toFixed(1),
+      apps: apps.map(a=>({name:a.name, minutes:a.minutes, time:fmtMin(a.minutes)}))
+    };
+    const all = JSON.parse(localStorage.getItem('screenData')||'{}');
+    all[todayStr] = screenData;
+    localStorage.setItem('screenData', JSON.stringify(all));
+    renderScreen();
+    status.textContent = '解析完成';
+    setTimeout(()=>status.textContent='', 2000);
+  } catch(e) {
+    status.textContent = '解析失败：' + e.message;
+  }
+  input.value = '';
 }
 
 // ========== 恢复状态 ==========
