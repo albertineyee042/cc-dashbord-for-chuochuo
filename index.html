@@ -807,20 +807,31 @@ async function syncToNotion() {
     });
   });
 
-  const content = [
-    {type:'heading_2', heading_2:{rich_text:[{type:'text',text:{content:dateLabel}}]}},
+  const innerBlocks = [
     {type:'paragraph', paragraph:{rich_text:[{type:'text',text:{content:`体重 ${d.weight||'--'}kg · 步数 ${d.steps||'--'} · 睡眠 ${d.sleep||'--'}h · 心情 ${mood} · 经期 ${phase}`}}]}},
-    {type:'divider', divider:{}},
-    ...(doneLines.length ? [
-      {type:'paragraph', paragraph:{rich_text:[{type:'text',text:{content:'✅ 今日完成'},annotations:{bold:true}}]}},
-      ...doneLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))
-    ] : []),
-    ...(pendingLines.length ? [
-      {type:'paragraph', paragraph:{rich_text:[{type:'text',text:{content:'📝 未完成'},annotations:{bold:true}}]}},
-      ...pendingLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))
-    ] : []),
-    {type:'divider', divider:{}}
+    ...(doneLines.length ? [{
+      type:'toggle',
+      toggle:{
+        rich_text:[{type:'text',text:{content:'✅ 今日完成'},annotations:{bold:true}}],
+        children: doneLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))
+      }
+    }] : []),
+    ...(pendingLines.length ? [{
+      type:'toggle',
+      toggle:{
+        rich_text:[{type:'text',text:{content:'📝 未完成'},annotations:{bold:true}}],
+        children: pendingLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))
+      }
+    }] : [])
   ];
+
+  const content = [{
+    type:'toggle',
+    toggle:{
+      rich_text:[{type:'text',text:{content:`📅 ${dateLabel}`},annotations:{bold:true}}],
+      children: innerBlocks
+    }
+  }];
 
   const btn = document.querySelector('.notion-sync-btn');
   btn.textContent = '同步中...';
