@@ -783,6 +783,34 @@ function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.sc
 const NOTION_PAGE_ID = '34b3c954-8a09-80c3-8fa0-cfa0af3415cb';
 const WORKER_URL = 'https://notion-proxy.albertineyee.workers.dev';
 
+async function notionFetch(method, endpoint, token, payload) {
+  const res = await fetch(WORKER_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Notion-Version':'2022-06-28'},
+    body: JSON.stringify({method, endpoint, payload})
+  });
+  return res.json();
+}
+
+async function generateDailyMessage(cfg, d) {
+  if (!cfg.key) return '今天也辛苦了。';
+  try {
+    const res = await fetch(cfg.url||'https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
+      body: JSON.stringify({
+        model: cfg.model||'glm-4-flash',
+        messages:[
+          {role:'system', content:'你是小德，戳戳的男朋友。183cm有腹肌，不是附庸。说话自然像男朋友，不像AI。不加表情符号。2-3句话。'},
+          {role:'user', content:`今天戳戳数据：体重${d.weight||'未填'}kg，步数${d.steps||'未填'}步，睡眠${d.sleep||'未填'}小时，心情${d.mood||'未填'}。写一段今日留言，关于她的成长、对她的期待或今天数据的感受，真实自然。`}
+        ]
+      })
+    });
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '今天也辛苦了。';
+  } catch(e) { return '今天也辛苦了。'; }
+}
+
 async function syncToNotion() {
   const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
   if (!cfg.notionKey) {
@@ -792,68 +820,62 @@ async function syncToNotion() {
     localStorage.setItem('chatConfig', JSON.stringify(cfg));
   }
 
-  const d = getDailyData(todayStr);
-  const dateLabel = TODAY.toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
-  const mood = d.mood||'--';
-  const phase = d.phase || (()=>{ const ap=getAutoPhase(todayStr); return ap?ap.phase:'--'; })();
-
-  // 整理待办
-  let doneLines = [], pendingLines = [];
-  CATS.forEach(cat => {
-    (todos[cat.name]||[]).forEach(t => {
-      const ts = t.done ? `✓${fmtTime(t.completedAt)}` : `+${fmtTime(t.createdAt)}`;
-      if (t.done) doneLines.push(`[${cat.name}] ${t.text}  ${ts}`);
-      else pendingLines.push(`[${cat.name}] ${t.text}  ${ts}`);
-    });
-  });
-
-  const innerBlocks = [
-    {type:'paragraph', paragraph:{rich_text:[{type:'text',text:{content:`体重 ${d.weight||'--'}kg · 步数 ${d.steps||'--'} · 睡眠 ${d.sleep||'--'}h · 心情 ${mood} · 经期 ${phase}`}}]}},
-    ...(doneLines.length ? [{
-      type:'toggle',
-      toggle:{
-        rich_text:[{type:'text',text:{content:'✅ 今日完成'},annotations:{bold:true}}],
-        children: doneLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))
-      }
-    }] : []),
-    ...(pendingLines.length ? [{
-      type:'toggle',
-      toggle:{
-        rich_text:[{type:'text',text:{content:'📝 未完成'},annotations:{bold:true}}],
-        children: pendingLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))
-      }
-    }] : [])
-  ];
-
-  const content = [{
-    type:'toggle',
-    toggle:{
-      rich_text:[{type:'text',text:{content:`📅 ${dateLabel}`},annotations:{bold:true}}],
-      children: innerBlocks
-    }
-  }];
-
   const btn = document.querySelector('.notion-sync-btn');
   btn.textContent = '同步中...';
   btn.disabled = true;
 
   try {
-    const res = await fetch(WORKER_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.notionKey,'Notion-Version':'2022-06-28'},
-      body: JSON.stringify({
-        endpoint: 'https://api.notion.com/v1/pages',
-        payload: {
-          parent:{page_id: NOTION_PAGE_ID},
-          properties:{title:{title:[{type:'text',text:{content:dateLabel}}]}},
-          children: content
-        }
-      })
+    const d = getDailyData(todayStr);
+    const monthLabel = `${TODAY.getFullYear()}年${TODAY.getMonth()+1}月`;
+    const dayLabel = TODAY.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'});
+    const mood = d.mood||'--';
+    const phase = d.phase||(getAutoPhase(todayStr)?.phase||'--');
+
+    let doneLines=[], pendingLines=[];
+    CATS.forEach(cat=>{
+      (todos[cat.name]||[]).forEach(t=>{
+        const ts = t.done?`✓${fmtTime(t.completedAt)}`:`+${fmtTime(t.createdAt)}`;
+        if(t.done) doneLines.push(`[${cat.name}] ${t.text}  ${ts}`);
+        else pendingLines.push(`[${cat.name}] ${t.text}  ${ts}`);
+      });
     });
-    if (res.ok) { btn.textContent = '同步成功 ✓'; setTimeout(()=>{ btn.textContent='同步今日记录到 Notion'; btn.disabled=false; }, 2000); }
-    else { const err=await res.json(); alert('同步失败：'+err.message); btn.textContent='同步今日记录到 Notion'; btn.disabled=false; }
+
+    const message = await generateDailyMessage(cfg, d);
+
+    const dailyChildren = [
+      {type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:`体重 ${d.weight||'--'}kg · 步数 ${d.steps||'--'} · 睡眠 ${d.sleep||'--'}h · 心情 ${mood} · 经期 ${phase}`}}]}},
+      ...(doneLines.length?[{type:'toggle',toggle:{rich_text:[{type:'text',text:{content:'✅ 今日完成'},annotations:{bold:true}}],children:doneLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))}}]:[]),
+      ...(pendingLines.length?[{type:'toggle',toggle:{rich_text:[{type:'text',text:{content:'📝 未完成'},annotations:{bold:true}}],children:pendingLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))}}]:[]),
+      {type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:'💌 '+message},annotations:{italic:true,color:'pink'}}]}}
+    ];
+
+    const dailyToggle = {
+      type:'toggle',
+      toggle:{rich_text:[{type:'text',text:{content:dayLabel},annotations:{bold:true}}],children:dailyChildren}
+    };
+
+    // 查找当月折叠
+    const blocksRes = await notionFetch('GET', `https://api.notion.com/v1/blocks/${NOTION_PAGE_ID}/children`, cfg.notionKey, null);
+    const blocks = blocksRes.results||[];
+    let monthBlockId = null;
+    for(const b of blocks){
+      if(b.type==='toggle' && (b.toggle?.rich_text?.[0]?.text?.content||'')=== monthLabel){
+        monthBlockId = b.id; break;
+      }
+    }
+
+    if(!monthBlockId){
+      await notionFetch('PATCH', `https://api.notion.com/v1/blocks/${NOTION_PAGE_ID}/children`, cfg.notionKey, {
+        children:[{type:'toggle',toggle:{rich_text:[{type:'text',text:{content:monthLabel},annotations:{bold:true}}],children:[dailyToggle]}}]
+      });
+    } else {
+      await notionFetch('PATCH', `https://api.notion.com/v1/blocks/${monthBlockId}/children`, cfg.notionKey, {children:[dailyToggle]});
+    }
+
+    btn.textContent='同步成功 ✓';
+    setTimeout(()=>{ btn.textContent='同步今日记录到 Notion'; btn.disabled=false; }, 2000);
   } catch(e) {
-    alert('网络错误，请检查连接');
+    alert('同步失败：'+e.message);
     btn.textContent='同步今日记录到 Notion';
     btn.disabled=false;
   }
