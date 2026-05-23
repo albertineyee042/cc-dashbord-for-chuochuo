@@ -399,6 +399,9 @@
 </div>
 
 <script>
+const NOTION_PAGE_ID = '34b3c954-8a09-80c3-8fa0-cfa0af3415cb';
+const WORKER_URL = 'https://notion-proxy.albertineyee.workers.dev';
+
 const TODAY = new Date();
 const todayStr = TODAY.toISOString().slice(0,10);
 
@@ -882,8 +885,6 @@ function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); se
 function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
 
 // ========== Notion 同步 ==========
-const NOTION_PAGE_ID = '34b3c954-8a09-80c3-8fa0-cfa0af3415cb';
-const WORKER_URL = 'https://notion-proxy.albertineyee.workers.dev';
 
 async function notionFetch(method, endpoint, token, payload) {
   const res = await fetch(WORKER_URL, {
