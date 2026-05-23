@@ -857,27 +857,11 @@ async function syncToNotion() {
     };
 
     // 查找当月折叠
-    btn.textContent = '读取Notion页面...';
-    const blocksRes = await notionFetch('GET', `https://api.notion.com/v1/blocks/${NOTION_PAGE_ID}/children`, cfg.notionKey, null);
-    if (blocksRes.object === 'error') throw new Error('Notion错误：' + blocksRes.message);
-    const blocks = blocksRes.results||[];
-    let monthBlockId = null;
-    for(const b of blocks){
-      if(b.type==='toggle' && (b.toggle?.rich_text?.[0]?.text?.content||'')=== monthLabel){
-        monthBlockId = b.id; break;
-      }
-    }
-
     btn.textContent = '写入Notion...';
-    if(!monthBlockId){
-      const r = await notionFetch('PATCH', `https://api.notion.com/v1/blocks/${NOTION_PAGE_ID}/children`, cfg.notionKey, {
-        children:[{type:'toggle',toggle:{rich_text:[{type:'text',text:{content:monthLabel},annotations:{bold:true}}],children:[dailyToggle]}}]
-      });
-      if(r.object==='error') throw new Error('写入失败：'+r.message);
-    } else {
-      const r = await notionFetch('PATCH', `https://api.notion.com/v1/blocks/${monthBlockId}/children`, cfg.notionKey, {children:[dailyToggle]});
-      if(r.object==='error') throw new Error('写入失败：'+r.message);
-    }
+    const r = await notionFetch('PATCH', `https://api.notion.com/v1/blocks/${NOTION_PAGE_ID}/children`, cfg.notionKey, {
+      children:[{type:'toggle',toggle:{rich_text:[{type:'text',text:{content:monthLabel},annotations:{bold:true}}],children:[dailyToggle]}}]
+    });
+    if(r.object==='error') throw new Error('写入失败：'+r.message);
 
     btn.textContent='同步成功 ✓';
     setTimeout(()=>{ btn.textContent='同步今日记录到 Notion'; btn.disabled=false; }, 2000);
