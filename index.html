@@ -485,7 +485,7 @@ async function todayPeriodStart() {
     const data = await res.json();
     const msg = data.choices?.[0]?.message?.content || '来了啊，注意保暖。';
     const hist = JSON.parse(localStorage.getItem('chatHistory')||'[]');
-    hist.push({role:'assistant', content: msg});
+    hist.push({role:'assistant', content: '[自动发送] ' + msg});
     localStorage.setItem('chatHistory', JSON.stringify(hist));
     // toast
     const toast = document.getElementById('auto-toast');
