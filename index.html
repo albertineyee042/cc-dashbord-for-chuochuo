@@ -150,6 +150,9 @@
 
     .done-title { font-size:10px; letter-spacing:.15em; color:var(--text-light); text-transform:uppercase; margin:14px 0 6px; }
     .empty-hint { font-size:13px; color:var(--text-light); text-align:center; padding:10px 0; }
+    .todo-ts { font-size:10px; color:var(--text-light); margin-left:6px; }
+    .notion-sync-btn { width:100%; padding:12px; border-radius:14px; border:none; background:var(--purple-soft); color:var(--purple); font-size:13px; font-weight:600; cursor:pointer; margin-top:8px; letter-spacing:.05em; }
+    .notion-sync-btn:active { opacity:.7; }
 
     /* 页脚 */
     .page-footer { text-align:center; font-size:10px; letter-spacing:.12em; color:var(--text-light); margin-top:20px; }
@@ -348,6 +351,7 @@
   <!-- ===== PAGE 3: TODAY ===== -->
   <div class="page" id="page-today">
     <div id="cat-sections"></div>
+    <button class="notion-sync-btn" onclick="syncToNotion()">同步今日记录到 Notion</button>
     <div class="page-footer" style="margin-top:20px">晏珠♥德尼</div>
   </div>
 
@@ -581,6 +585,12 @@ CATS.forEach(c=>{ if(!todos[c.name]) todos[c.name]=[]; });
 
 function saveTodos() { localStorage.setItem('todosV2', JSON.stringify(todos)); }
 
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
 function renderAllCats() {
   const container = document.getElementById('cat-sections');
   container.innerHTML = '';
@@ -588,11 +598,11 @@ function renderAllCats() {
     const items = todos[cat.name] || [];
     const pendingHtml = items.filter(t=>!t.done).map((t,_)=>{
       const i = todos[cat.name].indexOf(t);
-      return `<div class="todo-item"><div class="todo-check" onclick="toggleTodo('${cat.name}',${i})"></div><div class="todo-text">${t.text}</div><div class="todo-del" onclick="deleteTodo('${cat.name}',${i})">×</div></div>`;
+      return `<div class="todo-item"><div class="todo-check" onclick="toggleTodo('${cat.name}',${i})"></div><div class="todo-text">${t.text}<span class="todo-ts">+${fmtTime(t.createdAt)}</span></div><div class="todo-del" onclick="deleteTodo('${cat.name}',${i})">×</div></div>`;
     }).join('');
     const doneHtml = items.filter(t=>t.done).map((t,_)=>{
       const i = todos[cat.name].indexOf(t);
-      return `<div class="todo-item"><div class="todo-check done" onclick="toggleTodo('${cat.name}',${i})"></div><div class="todo-text done">${t.text}</div><div class="todo-del" onclick="deleteTodo('${cat.name}',${i})">×</div></div>`;
+      return `<div class="todo-item"><div class="todo-check done" onclick="toggleTodo('${cat.name}',${i})"></div><div class="todo-text done">${t.text}<span class="todo-ts">✓${fmtTime(t.completedAt)}</span></div><div class="todo-del" onclick="deleteTodo('${cat.name}',${i})">×</div></div>`;
     }).join('');
 
     container.innerHTML += `
@@ -617,13 +627,18 @@ function addTodo(cat) {
   const input = document.getElementById('input-'+cat);
   const text = input.value.trim();
   if (!text) return;
-  todos[cat].unshift({text, done:false});
+  todos[cat].unshift({text, done:false, createdAt: new Date().toISOString()});
   input.value = '';
   saveTodos();
   renderAllCats();
 }
 
-function toggleTodo(cat, i) { todos[cat][i].done = !todos[cat][i].done; saveTodos(); renderAllCats(); }
+function toggleTodo(cat, i) {
+  todos[cat][i].done = !todos[cat][i].done;
+  if (todos[cat][i].done) todos[cat][i].completedAt = new Date().toISOString();
+  else delete todos[cat][i].completedAt;
+  saveTodos(); renderAllCats();
+}
 function deleteTodo(cat, i) { todos[cat].splice(i,1); saveTodos(); renderAllCats(); }
 
 // ========== URL 参数导入（Apple Health 快捷指令） ==========
@@ -763,6 +778,71 @@ async function sendMsg() {
 
 function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); } }
 function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
+
+// ========== Notion 同步 ==========
+const NOTION_PAGE_ID = '34b3c954-8a09-80c3-8fa0-cfa0af3415cb';
+
+async function syncToNotion() {
+  const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
+  if (!cfg.notionKey) {
+    const key = prompt('请输入 Notion API Token（只需填一次）：');
+    if (!key) return;
+    cfg.notionKey = key.trim();
+    localStorage.setItem('chatConfig', JSON.stringify(cfg));
+  }
+
+  const d = getDailyData(todayStr);
+  const dateLabel = TODAY.toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  const mood = d.mood||'--';
+  const phase = d.phase || (()=>{ const ap=getAutoPhase(todayStr); return ap?ap.phase:'--'; })();
+
+  // 整理待办
+  let doneLines = [], pendingLines = [];
+  CATS.forEach(cat => {
+    (todos[cat.name]||[]).forEach(t => {
+      const ts = t.done ? `✓${fmtTime(t.completedAt)}` : `+${fmtTime(t.createdAt)}`;
+      if (t.done) doneLines.push(`[${cat.name}] ${t.text}  ${ts}`);
+      else pendingLines.push(`[${cat.name}] ${t.text}  ${ts}`);
+    });
+  });
+
+  const content = [
+    {type:'heading_2', heading_2:{rich_text:[{type:'text',text:{content:dateLabel}}]}},
+    {type:'paragraph', paragraph:{rich_text:[{type:'text',text:{content:`体重 ${d.weight||'--'}kg · 步数 ${d.steps||'--'} · 睡眠 ${d.sleep||'--'}h · 心情 ${mood} · 经期 ${phase}`}}]}},
+    {type:'divider', divider:{}},
+    ...(doneLines.length ? [
+      {type:'paragraph', paragraph:{rich_text:[{type:'text',text:{content:'✅ 今日完成'},annotations:{bold:true}}]}},
+      ...doneLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))
+    ] : []),
+    ...(pendingLines.length ? [
+      {type:'paragraph', paragraph:{rich_text:[{type:'text',text:{content:'📝 未完成'},annotations:{bold:true}}]}},
+      ...pendingLines.map(l=>({type:'bulleted_list_item',bulleted_list_item:{rich_text:[{type:'text',text:{content:l}}]}}))
+    ] : []),
+    {type:'divider', divider:{}}
+  ];
+
+  const btn = document.querySelector('.notion-sync-btn');
+  btn.textContent = '同步中...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('https://api.notion.com/v1/pages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.notionKey,'Notion-Version':'2022-06-28'},
+      body: JSON.stringify({
+        parent:{page_id: NOTION_PAGE_ID},
+        properties:{title:{title:[{type:'text',text:{content:dateLabel}}]}},
+        children: content
+      })
+    });
+    if (res.ok) { btn.textContent = '同步成功 ✓'; setTimeout(()=>{ btn.textContent='同步今日记录到 Notion'; btn.disabled=false; }, 2000); }
+    else { const err=await res.json(); alert('同步失败：'+err.message); btn.textContent='同步今日记录到 Notion'; btn.disabled=false; }
+  } catch(e) {
+    alert('网络错误，请检查连接');
+    btn.textContent='同步今日记录到 Notion';
+    btn.disabled=false;
+  }
+}
 </script>
 </div>
 
