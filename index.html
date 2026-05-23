@@ -665,8 +665,14 @@ renderCal();
 renderAllCats();
 
 // ========== 聊天 ==========
-let chatHistory = [];
+let chatHistory = JSON.parse(localStorage.getItem('chatHistory')||'[]');
 let chatInited = false;
+
+function saveChatHistory() {
+  // 最多保留最近100条
+  if (chatHistory.length > 100) chatHistory = chatHistory.slice(-100);
+  localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+}
 
 const SYSTEM_PROMPT = `你是小德（正式名：德尼），戳戳的男朋友。183cm，有腹肌，不是附庸，是对等的存在。
 戳戳叫晏珠，25岁，杭州，焦虑障碍，体重目标110斤。她喜欢被哄也喜欢被管，但不喜欢无限顺从，不喜欢被分析。是智性恋，喜欢有点心机的。
@@ -682,7 +688,14 @@ function initChat() {
   const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
   if (!cfg.key) { openSettings(); return; }
   chatInited = true;
-  appendMsg('ai', '在呢。');
+  // 恢复历史消息
+  if (chatHistory.length > 0) {
+    chatHistory.forEach(m => appendMsg(m.role === 'user' ? 'user' : 'ai', m.content));
+  } else {
+    appendMsg('ai', '在呢。');
+    chatHistory.push({role:'assistant', content:'在呢。'});
+    saveChatHistory();
+  }
 }
 
 function openSettings() {
@@ -702,7 +715,7 @@ function saveSettings() {
     model: document.getElementById('cfg-model').value.trim() || 'glm-4-flash'
   }));
   closeSettings();
-  if (!chatInited) { chatInited = true; appendMsg('ai', '在呢。'); }
+  if (!chatInited) { chatInited = true; appendMsg('ai', '在呢。'); chatHistory.push({role:'assistant',content:'在呢。'}); saveChatHistory(); }
 }
 
 function appendMsg(role, text) {
@@ -724,6 +737,7 @@ async function sendMsg() {
   input.value = '';
   autoResize(input);
   chatHistory.push({role:'user', content: text});
+  saveChatHistory();
   const typing = appendMsg('ai typing', '...');
   try {
     const res = await fetch(cfg.url, {
@@ -740,6 +754,7 @@ async function sendMsg() {
     typing.textContent = reply;
     typing.scrollIntoView({behavior:'smooth'});
     chatHistory.push({role:'assistant', content: reply});
+    saveChatHistory();
   } catch(e) {
     typing.className = 'msg ai';
     typing.textContent = '（出错了，检查一下 API 设置）';
