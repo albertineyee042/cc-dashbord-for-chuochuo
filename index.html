@@ -358,7 +358,7 @@
       </div>
       <div>
         <div class="settings-label">模型</div>
-        <select class="settings-select" id="cfg-model-sel"></select>
+        <select class="settings-select" id="cfg-model-sel" onchange="onModelChange()"></select>
         <input class="settings-input" id="cfg-model-txt" placeholder="模型名称" style="display:none;margin-top:0">
       </div>
       <button class="settings-save" onclick="saveSettings()">保存</button>
@@ -781,15 +781,16 @@ function initChat() {
   }
 }
 
+const _CUSTOM = ['_custom_','— 自定义 —'];
 const PROVIDERS = {
   zhipu:    { url:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-              models:[['glm-4-flash','glm-4-flash'],['glm-4.5-air','glm-4.5-air ★★★'],['glm-4','glm-4 ★★★'],['glm-4-plus','glm-4-plus ★★★★']] },
+              models:[['glm-4-flash','glm-4-flash'],['glm-4.5-air','glm-4.5-air ★★★'],['glm-4','glm-4 ★★★'],['glm-4v','glm-4v ★★★'],['glm-4-plus','glm-4-plus ★★★★'],_CUSTOM] },
   claude:   { url: WORKER_URL+'/claude',
-              models:[['claude-haiku-4-5-20251001','Haiku 4.5 ★★★'],['claude-sonnet-4-6','Sonnet 4.6 ★★★★'],['claude-opus-4-7','Opus 4.7 ★★★★★']] },
+              models:[['claude-haiku-4-5-20251001','Haiku 4.5 ★★★'],['claude-sonnet-4-6','Sonnet 4.6 ★★★★'],['claude-opus-4-7','Opus 4.7 ★★★★★'],_CUSTOM] },
   deepseek: { url:'https://api.deepseek.com/v1/chat/completions',
-              models:[['deepseek-chat','deepseek-chat ★★★'],['deepseek-reasoner','deepseek-reasoner ★★★★']] },
+              models:[['deepseek-chat','deepseek-chat ★★★'],['deepseek-reasoner','deepseek-reasoner ★★★★'],_CUSTOM] },
   openai:   { url:'https://api.openai.com/v1/chat/completions',
-              models:[['gpt-4o-mini','gpt-4o-mini ★★★'],['gpt-4o','gpt-4o ★★★★'],['gpt-4.1','gpt-4.1 ★★★★★']] },
+              models:[['gpt-4o-mini','gpt-4o-mini ★★★'],['gpt-4o','gpt-4o ★★★★'],['gpt-4.1','gpt-4.1 ★★★★★'],_CUSTOM] },
   custom:   { url:'', models:[] }
 };
 
@@ -800,10 +801,19 @@ function onProviderChange() {
   const sel = document.getElementById('cfg-model-sel');
   const txt = document.getElementById('cfg-model-txt');
   sel.style.display = isCustom ? 'none' : 'block';
-  txt.style.display = isCustom ? 'block' : 'none';
   if (!isCustom) {
     sel.innerHTML = PROVIDERS[pk].models.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   }
+  onModelChange();
+}
+
+function onModelChange() {
+  const pk = document.getElementById('cfg-provider').value;
+  const sel = document.getElementById('cfg-model-sel');
+  const txt = document.getElementById('cfg-model-txt');
+  const showTxt = pk === 'custom' || sel.value === '_custom_';
+  txt.style.display = showTxt ? 'block' : 'none';
+  if (showTxt && pk !== 'custom') txt.placeholder = '输入模型名称，如 glm-4.6v';
 }
 
 function openSettings() {
@@ -817,7 +827,14 @@ function openSettings() {
     document.getElementById('cfg-model-txt').value = cfg.model||'';
   } else {
     const sel = document.getElementById('cfg-model-sel');
-    if (cfg.model) sel.value = cfg.model;
+    const knownVals = PROVIDERS[pk].models.map(([v])=>v);
+    if (cfg.model && knownVals.includes(cfg.model)) {
+      sel.value = cfg.model;
+    } else if (cfg.model) {
+      sel.value = '_custom_';
+      document.getElementById('cfg-model-txt').value = cfg.model;
+    }
+    onModelChange();
   }
   document.getElementById('settings-panel').classList.add('open');
 }
@@ -828,7 +845,8 @@ function saveSettings() {
   const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
   const pk = document.getElementById('cfg-provider').value;
   const url = pk === 'custom' ? document.getElementById('cfg-custom-url').value.trim() : PROVIDERS[pk].url;
-  const model = pk === 'custom' ? document.getElementById('cfg-model-txt').value.trim() : document.getElementById('cfg-model-sel').value;
+  const selVal = document.getElementById('cfg-model-sel').value;
+  const model = (pk === 'custom' || selVal === '_custom_') ? document.getElementById('cfg-model-txt').value.trim() : selVal;
   localStorage.setItem('chatConfig', JSON.stringify({
     ...cfg,
     key: document.getElementById('cfg-key').value.trim(),
