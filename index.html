@@ -705,12 +705,12 @@ function renderScreen() {
   const data = all[todayStr];
   if (!data) return;
   const tot = data.total || 0;
-  const th = Math.floor(tot/60), tm = tot%60;
+  const th = Math.floor(tot/3600), tm = Math.floor((tot%3600)/60);
   document.getElementById('screen-total').textContent = tot ? (th>0?`${th}小时${tm}分钟`:`${tm}分钟`) : '--';
-  const maxMin = data.apps ? Math.max(...data.apps.map(a=>a.minutes||0), 1) : 1;
+  const maxSec = data.apps ? Math.max(...data.apps.map(a=>a.seconds||a.minutes*60||0), 1) : 1;
   document.getElementById('app-list').innerHTML = (data.apps||[]).map((app, i) => {
     const color = APP_COLORS[i % APP_COLORS.length];
-    const pct = Math.round((app.minutes||0) / maxMin * 100);
+    const pct = Math.round((app.seconds||app.minutes*60||0) / maxSec * 100);
     return `<div class="app-row">
       <div class="app-top">
         <div class="app-dot" style="background:${color}"></div>
@@ -767,16 +767,16 @@ async function parseScreenshot(input) {
     content = content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
     const parsed = JSON.parse(content);
     const apps = parsed.apps || [];
-    const fmtMin = m => {
-      if (m < 1) return '<1m';
-      const h=Math.floor(m/60), mn=m%60;
-      return h>0 ? `${h}h ${mn}m` : `${mn}m`;
+    const fmtSec = s => {
+      if (s < 60) return `${s}s`;
+      const h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+      return h>0 ? `${h}h ${m}m` : `${m}m`;
     };
-    const roundedApps = apps.map(a => ({...a, minutes: Math.max(1, Math.round(a.minutes||0))}));
-    const totalMin = roundedApps.reduce((s,a)=>s+a.minutes,0);
+    const parsedApps = apps.map(a => ({...a, seconds: Math.round(a.seconds||a.minutes*60||0)}));
+    const totalSec = parsedApps.reduce((s,a)=>s+a.seconds,0);
     const screenData = {
-      total: totalMin,
-      apps: roundedApps.map(a=>({name:a.name, minutes:a.minutes, time:fmtMin(a.minutes)}))
+      total: totalSec,
+      apps: parsedApps.map(a=>({name:a.name, seconds:a.seconds, time:fmtSec(a.seconds)}))
     };
     const all = JSON.parse(localStorage.getItem('screenData')||'{}');
     all[todayStr] = screenData;
