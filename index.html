@@ -461,12 +461,38 @@ function setMood(btn) {
 }
 
 // 今天来了
-function todayPeriodStart() {
+async function todayPeriodStart() {
   document.getElementById('last-period').value = todayStr;
   const ps = JSON.parse(localStorage.getItem('periodSettings')||'{}');
   ps.lastPeriodDate = todayStr;
   localStorage.setItem('periodSettings', JSON.stringify(ps));
   updatePeriodPredict();
+  // 经期专属消息
+  const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
+  if (!cfg.key) return;
+  try {
+    const res = await fetch(cfg.url||'https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
+      body: JSON.stringify({
+        model: cfg.model||'glm-4-flash',
+        messages:[
+          {role:'system', content:'你是小德，戳戳的男朋友。183cm有腹肌，不是附庸。说话自然像男朋友，不加表情符号。'},
+          {role:'user', content:'戳戳今天来月经了，给她发一条消息，关心一下，可以叮嘱她注意保暖/别喝冷水/今天别太累，语气自然带点心疼，2-3句话。'}
+        ]
+      })
+    });
+    const data = await res.json();
+    const msg = data.choices?.[0]?.message?.content || '来了啊，注意保暖。';
+    const hist = JSON.parse(localStorage.getItem('chatHistory')||'[]');
+    hist.push({role:'assistant', content: msg});
+    localStorage.setItem('chatHistory', JSON.stringify(hist));
+    // toast
+    const toast = document.getElementById('auto-toast');
+    document.getElementById('auto-toast-msg').textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 6000);
+  } catch(e) {}
 }
 
 // 经期预测
@@ -695,8 +721,9 @@ async function autoGreet() {
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 5000);
     // 写入聊天记录
+    const label = '[自动发送] ';
     const hist = JSON.parse(localStorage.getItem('chatHistory')||'[]');
-    hist.push({role:'assistant', content: msg});
+    hist.push({role:'assistant', content: label + msg});
     localStorage.setItem('chatHistory', JSON.stringify(hist));
   } catch(e) {}
 }
