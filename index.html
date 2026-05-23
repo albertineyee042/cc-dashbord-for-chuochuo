@@ -115,6 +115,7 @@
     .cal-day.today { border:1.5px solid var(--pink); }
     .cal-day.other-month .cal-day-num { color:var(--text-light); opacity:.4; }
     .cal-mood { font-size:clamp(10px, 3vw, 14px); line-height:1; }
+    .cal-phase-bar { width:55%; height:3px; border-radius:2px; }
 
     /* SCREEN */
     .screen-big { font-size:38px; font-weight:700; color:var(--text-dark); letter-spacing:-1px; text-align:center; display:block; width:100%; }
@@ -533,6 +534,7 @@ function renderCal() {
       <div class="cal-day${isToday?' today':''}" style="background:${phaseColor !== 'transparent' ? phaseColor+'55' : ''}">
         <div class="cal-day-num">${d}</div>
         ${daily.mood ? `<div class="cal-mood">${daily.mood}</div>` : ''}
+        ${phaseColor !== 'transparent' ? `<div class="cal-phase-bar" style="background:${phaseColor}"></div>` : '<div class="cal-phase-bar"></div>'}
       </div>`;
   }
 
