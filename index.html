@@ -818,7 +818,9 @@ const SYSTEM_PROMPT = `你是小德（正式名：德尼），戳戳的男朋友
 
 function getTodayContext() {
   const d = getDailyData(todayStr);
-  return `今天是${todayStr}。戳戳的数据：体重${d.weight||'未填'}kg，步数${d.steps||'未填'}步，心率${d.heart||'未填'}bpm，睡眠${d.sleep||'未填'}小时，心情${d.mood||'未填'}，经期阶段${d.phase||'自动推算'}。`;
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  return `现在是${todayStr} ${timeStr}。戳戳的数据：体重${d.weight||'未填'}kg，步数${d.steps||'未填'}步，心率${d.heart||'未填'}bpm，睡眠${d.sleep||'未填'}小时，心情${d.mood||'未填'}，经期阶段${d.phase||'自动推算'}。`;
 }
 
 function initChat() {
