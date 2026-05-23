@@ -956,8 +956,7 @@ async function syncToNotion() {
 
   try {
     const d = getDailyData(todayStr);
-    const monthLabel = `${TODAY.getFullYear()}年${TODAY.getMonth()+1}月`;
-    const dayLabel = TODAY.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'});
+    const dayLabel = TODAY.toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
     const mood = d.mood||'--';
     const phase = d.phase||(getAutoPhase(todayStr)?.phase||'--');
 
@@ -987,18 +986,12 @@ async function syncToNotion() {
       {type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:'💌 '+message},annotations:{italic:true,color:'pink'}}]}}
     ];
 
-    const monthToggle = {
+    const dayToggle = {
       type:'toggle',
-      toggle:{
-        rich_text:[{type:'text',text:{content:monthLabel},annotations:{bold:true,color:'pink'}}],
-        children:[{
-          type:'toggle',
-          toggle:{rich_text:[{type:'text',text:{content:dayLabel},annotations:{bold:true}}],children:dailyChildren}
-        }]
-      }
+      toggle:{rich_text:[{type:'text',text:{content:dayLabel},annotations:{bold:true}}],children:dailyChildren}
     };
 
-    const r = await appendToNotion(NOTION_PAGE_ID, [monthToggle], cfg.notionKey);
+    const r = await appendToNotion(NOTION_PAGE_ID, [dayToggle], cfg.notionKey);
     if(r.object==='error') throw new Error('写入失败：'+r.message);
 
     btn.textContent='同步成功 ✓';
