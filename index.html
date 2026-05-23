@@ -32,6 +32,7 @@
     .topbar-date { font-size:20px; font-weight:700; color:var(--text-dark); margin-top:2px; }
     .live-badge { display:flex; align-items:center; gap:5px; font-size:11px; letter-spacing:.1em; color:var(--pink); }
     .live-dot { width:7px; height:7px; border-radius:50%; background:var(--pink); animation:pulse 2s infinite; }
+    .topbar-clock { font-size:22px; font-weight:700; color:var(--text-dark); letter-spacing:-.5px; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
     /* 页面 */
@@ -202,7 +203,10 @@
     <div class="topbar-title">戳戳监控台</div>
     <div class="topbar-date" id="today-date"></div>
   </div>
-  <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+    <div class="topbar-clock" id="topbar-clock"></div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
 </div>
 
 <div class="pages">
@@ -410,6 +414,14 @@ const todayStr = TODAY.toISOString().slice(0,10);
 
 // 日期显示
 document.getElementById('today-date').textContent = TODAY.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'});
+
+// 时钟
+function updateClock() {
+  const now = new Date();
+  document.getElementById('topbar-clock').textContent = now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+}
+updateClock();
+setInterval(updateClock, 1000);
 
 // Tab切换
 function switchTab(name, el) {
@@ -755,11 +767,16 @@ async function parseScreenshot(input) {
     content = content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
     const parsed = JSON.parse(content);
     const apps = parsed.apps || [];
-    const fmtMin = m => { const h=Math.floor(m/60),mn=m%60; return h>0?`${h}h ${mn}m`:`${mn}m`; };
-    const totalMin = apps.reduce((s,a)=>s+(a.minutes||0),0);
+    const fmtMin = m => {
+      if (m < 1) return '<1m';
+      const h=Math.floor(m/60), mn=m%60;
+      return h>0 ? `${h}h ${mn}m` : `${mn}m`;
+    };
+    const roundedApps = apps.map(a => ({...a, minutes: Math.max(1, Math.round(a.minutes||0))}));
+    const totalMin = roundedApps.reduce((s,a)=>s+a.minutes,0);
     const screenData = {
       total: totalMin,
-      apps: apps.map(a=>({name:a.name, minutes:a.minutes, time:fmtMin(a.minutes)}))
+      apps: roundedApps.map(a=>({name:a.name, minutes:a.minutes, time:fmtMin(a.minutes)}))
     };
     const all = JSON.parse(localStorage.getItem('screenData')||'{}');
     all[todayStr] = screenData;
