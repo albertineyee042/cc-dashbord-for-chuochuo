@@ -858,8 +858,10 @@ async function syncToNotion() {
 
     // 查找当月折叠
     btn.textContent = '写入Notion...';
-    const r = await notionFetch('PATCH', `https://api.notion.com/v1/blocks/${NOTION_PAGE_ID}/children`, cfg.notionKey, {
-      children:[{type:'toggle',toggle:{rich_text:[{type:'text',text:{content:monthLabel},annotations:{bold:true}}],children:[dailyToggle]}}]
+    const r = await notionFetch('POST', 'https://api.notion.com/v1/pages', cfg.notionKey, {
+      parent: {page_id: NOTION_PAGE_ID},
+      properties: {title:{title:[{type:'text',text:{content:`${monthLabel} · ${dayLabel}`}}]}},
+      children: dailyChildren
     });
     if(r.object==='error') throw new Error('写入失败：'+r.message);
 
