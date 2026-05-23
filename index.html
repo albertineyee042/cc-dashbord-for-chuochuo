@@ -308,42 +308,9 @@
   <div class="page" id="page-screen">
     <div class="section-label">今日屏幕时间</div>
     <div class="card">
-      <input class="editable screen-big" id="screen-total" value="-- h -- m">
+      <div class="val-row"><div class="screen-big" id="screen-total">--</div><span class="big-unit" style="font-size:20px;margin-left:6px">h</span></div>
       <div class="screen-sub">total today</div>
-      <div id="app-list">
-        <div class="app-row">
-          <div class="app-top">
-            <div class="app-dot" style="background:var(--pink)"></div>
-            <input class="app-name-in" value="小红书">
-            <input class="app-time-in" value="-- h --m">
-          </div>
-          <div class="app-bar-bg"><div class="app-bar-fill" style="width:75%;background:var(--pink)"></div></div>
-        </div>
-        <div class="app-row">
-          <div class="app-top">
-            <div class="app-dot" style="background:var(--blue)"></div>
-            <input class="app-name-in" value="微信">
-            <input class="app-time-in" value="-- h --m">
-          </div>
-          <div class="app-bar-bg"><div class="app-bar-fill" style="width:55%;background:var(--blue)"></div></div>
-        </div>
-        <div class="app-row">
-          <div class="app-top">
-            <div class="app-dot" style="background:var(--purple)"></div>
-            <input class="app-name-in" value="Claude">
-            <input class="app-time-in" value="-- h --m">
-          </div>
-          <div class="app-bar-bg"><div class="app-bar-fill" style="width:38%;background:var(--purple)"></div></div>
-        </div>
-        <div class="app-row">
-          <div class="app-top">
-            <div class="app-dot" style="background:var(--green)"></div>
-            <input class="app-name-in" value="其他">
-            <input class="app-time-in" value="-- h --m">
-          </div>
-          <div class="app-bar-bg"><div class="app-bar-fill" style="width:20%;background:var(--green)"></div></div>
-        </div>
-      </div>
+      <div id="app-list" style="margin-top:12px"></div>
     </div>
     <div class="page-footer" style="margin-top:30px">晏珠♥德尼</div>
   </div>
@@ -650,7 +617,39 @@ function readUrlParams() {
     const val = p.get(param);
     if (val !== null) { saveDailyData(key, isNaN(val) ? val : Number(val)); hasData = true; }
   });
+  const screenParam = p.get('screen');
+  if (screenParam) {
+    try {
+      const screenData = JSON.parse(decodeURIComponent(screenParam));
+      const all = JSON.parse(localStorage.getItem('screenData')||'{}');
+      all[todayStr] = screenData;
+      localStorage.setItem('screenData', JSON.stringify(all));
+      hasData = true;
+    } catch(e) {}
+  }
   if (hasData) history.replaceState({}, '', window.location.pathname);
+}
+
+const APP_COLORS = ['var(--pink)','var(--blue)','var(--purple)','var(--green)','var(--orange)'];
+
+function renderScreen() {
+  const all = JSON.parse(localStorage.getItem('screenData')||'{}');
+  const data = all[todayStr];
+  if (!data) return;
+  document.getElementById('screen-total').textContent = data.total || '--';
+  const maxMin = data.apps ? Math.max(...data.apps.map(a=>a.minutes||0), 1) : 1;
+  document.getElementById('app-list').innerHTML = (data.apps||[]).map((app, i) => {
+    const color = APP_COLORS[i % APP_COLORS.length];
+    const pct = Math.round((app.minutes||0) / maxMin * 100);
+    return `<div class="app-row">
+      <div class="app-top">
+        <div class="app-dot" style="background:${color}"></div>
+        <div class="app-name-in">${app.name}</div>
+        <div class="app-time-in">${app.time}</div>
+      </div>
+      <div class="app-bar-bg"><div class="app-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }).join('');
 }
 
 // ========== 恢复状态 ==========
@@ -678,6 +677,7 @@ readUrlParams();
 restoreToday();
 renderCal();
 renderAllCats();
+renderScreen();
 
 // ========== 聊天 ==========
 let chatHistory = JSON.parse(localStorage.getItem('chatHistory')||'[]');
