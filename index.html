@@ -346,6 +346,7 @@
         <div class="settings-label">接口</div>
         <select class="settings-select" id="cfg-provider" onchange="onProviderChange()">
           <option value="zhipu">智谱 GLM</option>
+          <option value="claude">Claude</option>
           <option value="deepseek">DeepSeek</option>
           <option value="openai">OpenAI</option>
           <option value="custom">自定义</option>
@@ -780,6 +781,8 @@ function initChat() {
 const PROVIDERS = {
   zhipu:    { url:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
               models:[['glm-4-flash','glm-4-flash'],['glm-4.5-air','glm-4.5-air ★★★'],['glm-4','glm-4 ★★★'],['glm-4-plus','glm-4-plus ★★★★']] },
+  claude:   { url: WORKER_URL+'/claude',
+              models:[['claude-haiku-4-5-20251001','Haiku 4.5 ★★★'],['claude-sonnet-4-6','Sonnet 4.6 ★★★★'],['claude-opus-4-7','Opus 4.7 ★★★★★']] },
   deepseek: { url:'https://api.deepseek.com/v1/chat/completions',
               models:[['deepseek-chat','deepseek-chat ★★★'],['deepseek-reasoner','deepseek-reasoner ★★★★']] },
   openai:   { url:'https://api.openai.com/v1/chat/completions',
