@@ -317,7 +317,7 @@
   <div class="page" id="page-screen">
     <div class="section-label">今日屏幕时间</div>
     <div class="card">
-      <div class="val-row"><div class="screen-big" id="screen-total">--</div><span class="big-unit" style="font-size:20px;margin-left:6px">h</span></div>
+      <div class="val-row" style="justify-content:center"><div class="screen-big" id="screen-total">--</div></div>
       <div class="screen-sub">total today</div>
       <div id="app-list" style="margin-top:12px"></div>
     </div>
@@ -692,7 +692,9 @@ function renderScreen() {
   const all = JSON.parse(localStorage.getItem('screenData')||'{}');
   const data = all[todayStr];
   if (!data) return;
-  document.getElementById('screen-total').textContent = data.total || '--';
+  const tot = data.total || 0;
+  const th = Math.floor(tot/60), tm = tot%60;
+  document.getElementById('screen-total').textContent = tot ? (th>0?`${th}小时${tm}分钟`:`${tm}分钟`) : '--';
   const maxMin = data.apps ? Math.max(...data.apps.map(a=>a.minutes||0), 1) : 1;
   document.getElementById('app-list').innerHTML = (data.apps||[]).map((app, i) => {
     const color = APP_COLORS[i % APP_COLORS.length];
@@ -756,7 +758,7 @@ async function parseScreenshot(input) {
     const fmtMin = m => { const h=Math.floor(m/60),mn=m%60; return h>0?`${h}h ${mn}m`:`${mn}m`; };
     const totalMin = apps.reduce((s,a)=>s+(a.minutes||0),0);
     const screenData = {
-      total: (totalMin/60).toFixed(1),
+      total: totalMin,
       apps: apps.map(a=>({name:a.name, minutes:a.minutes, time:fmtMin(a.minutes)}))
     };
     const all = JSON.parse(localStorage.getItem('screenData')||'{}');
