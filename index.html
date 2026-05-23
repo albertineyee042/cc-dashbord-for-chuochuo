@@ -339,22 +339,26 @@
     <div class="settings-panel" id="settings-panel">
       <div class="settings-title">API 设置</div>
       <div>
-        <div class="settings-label">API Key</div>
-        <input class="settings-input" id="cfg-key" type="password" placeholder="输入你的 API Key">
+        <div class="settings-label">Key</div>
+        <input class="settings-input" id="cfg-key" type="password" placeholder="API Key">
       </div>
       <div>
+        <div class="settings-label">接口</div>
+        <select class="settings-select" id="cfg-provider" onchange="onProviderChange()">
+          <option value="zhipu">智谱 GLM</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="openai">OpenAI</option>
+          <option value="custom">自定义</option>
+        </select>
+      </div>
+      <div id="row-custom-url" style="display:none">
         <div class="settings-label">接口地址</div>
-        <input class="settings-input" id="cfg-url" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions">
-        <div class="settings-hint">换成其他服务商（DeepSeek/OpenAI）时才需要改</div>
+        <input class="settings-input" id="cfg-custom-url" placeholder="https://...">
       </div>
       <div>
         <div class="settings-label">模型</div>
-        <select class="settings-select" id="cfg-model">
-          <option value="glm-4-flash">glm-4-flash — 免费，速度最快</option>
-          <option value="glm-4.5-air">glm-4.5-air — 1200万tokens包，质量更好 ★</option>
-          <option value="glm-4">glm-4 — 200万tokens包，效果均衡</option>
-          <option value="glm-4-plus">glm-4-plus — 购买额度，质量最好</option>
-        </select>
+        <select class="settings-select" id="cfg-model-sel"></select>
+        <input class="settings-input" id="cfg-model-txt" placeholder="模型名称" style="display:none;margin-top:0">
       </div>
       <button class="settings-save" onclick="saveSettings()">保存</button>
       <button class="settings-back" onclick="closeSettings()">取消</button>
@@ -773,21 +777,56 @@ function initChat() {
   }
 }
 
+const PROVIDERS = {
+  zhipu:    { url:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+              models:[['glm-4-flash','glm-4-flash'],['glm-4.5-air','glm-4.5-air ★★★'],['glm-4','glm-4 ★★★'],['glm-4-plus','glm-4-plus ★★★★']] },
+  deepseek: { url:'https://api.deepseek.com/v1/chat/completions',
+              models:[['deepseek-chat','deepseek-chat ★★★'],['deepseek-reasoner','deepseek-reasoner ★★★★']] },
+  openai:   { url:'https://api.openai.com/v1/chat/completions',
+              models:[['gpt-4o-mini','gpt-4o-mini ★★★'],['gpt-4o','gpt-4o ★★★★'],['gpt-4.1','gpt-4.1 ★★★★★']] },
+  custom:   { url:'', models:[] }
+};
+
+function onProviderChange() {
+  const pk = document.getElementById('cfg-provider').value;
+  const isCustom = pk === 'custom';
+  document.getElementById('row-custom-url').style.display = isCustom ? 'block' : 'none';
+  const sel = document.getElementById('cfg-model-sel');
+  const txt = document.getElementById('cfg-model-txt');
+  sel.style.display = isCustom ? 'none' : 'block';
+  txt.style.display = isCustom ? 'block' : 'none';
+  if (!isCustom) {
+    sel.innerHTML = PROVIDERS[pk].models.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  }
+}
+
 function openSettings() {
   const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
   document.getElementById('cfg-key').value = cfg.key||'';
-  document.getElementById('cfg-url').value = cfg.url||'https://open.bigmodel.cn/api/paas/v4/chat/completions';
-  document.getElementById('cfg-model').value = cfg.model||'glm-4-flash';
+  const pk = cfg.provider||'zhipu';
+  document.getElementById('cfg-provider').value = pk;
+  onProviderChange();
+  if (pk === 'custom') {
+    document.getElementById('cfg-custom-url').value = cfg.url||'';
+    document.getElementById('cfg-model-txt').value = cfg.model||'';
+  } else {
+    const sel = document.getElementById('cfg-model-sel');
+    if (cfg.model) sel.value = cfg.model;
+  }
   document.getElementById('settings-panel').classList.add('open');
 }
 
 function closeSettings() { document.getElementById('settings-panel').classList.remove('open'); }
 
 function saveSettings() {
+  const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
+  const pk = document.getElementById('cfg-provider').value;
+  const url = pk === 'custom' ? document.getElementById('cfg-custom-url').value.trim() : PROVIDERS[pk].url;
+  const model = pk === 'custom' ? document.getElementById('cfg-model-txt').value.trim() : document.getElementById('cfg-model-sel').value;
   localStorage.setItem('chatConfig', JSON.stringify({
+    ...cfg,
     key: document.getElementById('cfg-key').value.trim(),
-    url: document.getElementById('cfg-url').value.trim() || 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    model: document.getElementById('cfg-model').value || 'glm-4-flash'
+    provider: pk, url, model
   }));
   closeSettings();
   if (!chatInited) { chatInited = true; appendMsg('ai', '在呢。'); chatHistory.push({role:'assistant',content:'在呢。'}); saveChatHistory(); }
