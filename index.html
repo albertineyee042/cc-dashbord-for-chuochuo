@@ -690,9 +690,9 @@ function toggleTodo(cat, i) {
 }
 function deleteTodo(cat, i) { todos[cat].splice(i,1); saveTodos(); renderAllCats(); }
 
-// ========== URL 参数导入（Apple Health 快捷指令） ==========
-function readUrlParams() {
-  const p = new URLSearchParams(window.location.search);
+// ========== 参数导入（Apple Health 快捷指令，支持 ? 和 # 两种方式） ==========
+function parseHealthParams(search) {
+  const p = new URLSearchParams(search);
   const map = {weight:'weight',steps:'steps',heart:'heart',spo2:'oxygen',sleep:'sleep',sleepStart:'sleepStart',sleepEnd:'sleepEnd'};
   let hasData = false;
   Object.entries(map).forEach(([param, key]) => {
@@ -715,9 +715,24 @@ function readUrlParams() {
       hasData = true;
     } catch(e) {}
   }
+  return hasData;
+}
+
+function readUrlParams() {
+  // 优先读 hash（iOS Safari 复用 tab 时 hash 变化会触发 hashchange）
+  const hashStr = window.location.hash.slice(1);
+  const queryStr = window.location.search.slice(1);
+  const src = hashStr || queryStr;
+  if (!src) return false;
+  const hasData = parseHealthParams(src);
   if (hasData) history.replaceState({}, '', window.location.pathname);
   return hasData;
 }
+
+// hash 变化时实时接收数据（iOS Safari 不重载页面时走这里）
+window.addEventListener('hashchange', function() {
+  if (readUrlParams()) restoreToday();
+});
 
 const APP_COLORS = ['var(--pink)','var(--blue)','var(--purple)','var(--green)','var(--orange)'];
 
