@@ -853,6 +853,14 @@ if (ps.lastPeriodDate) {
 
 const _urlHasData = readUrlParams();
 restoreToday();
+
+// 处理 iOS Safari 复用 tab 不重新加载的情况
+window.addEventListener('pageshow', function(e) {
+  if (readUrlParams()) restoreToday();
+});
+window.addEventListener('focus', function() {
+  if (readUrlParams()) restoreToday();
+});
 renderCal();
 renderAllCats();
 renderScreen();
