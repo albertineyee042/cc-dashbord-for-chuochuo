@@ -869,12 +869,35 @@ if (ps.lastPeriodDate) {
 const _urlHasData = readUrlParams();
 restoreToday();
 
-// 处理 iOS Safari 复用 tab 不重新加载的情况
-window.addEventListener('pageshow', function(e) {
-  if (readUrlParams()) restoreToday();
-});
-window.addEventListener('focus', function() {
-  if (readUrlParams()) restoreToday();
+// 从 Worker 拉最新健康数据
+async function fetchWorkerHealth() {
+  try {
+    const res = await fetch('https://notion-proxy.albertineyee.workers.dev/health-data');
+    const d = await res.json();
+    if (!d._t) return;
+    const last = parseInt(localStorage.getItem('lastWorkerSync')||'0');
+    if (d._t <= last) return;
+    localStorage.setItem('lastWorkerSync', d._t);
+    if (d.weight) { document.getElementById('weight-val').value = d.weight; updateWeight(); }
+    if (d.steps) { document.getElementById('steps-val').value = d.steps; updateSteps(); }
+    if (d.heart) { document.getElementById('heart-val').value = d.heart; }
+    if (d.oxygen) { document.getElementById('oxygen-val').value = d.oxygen; }
+    if (d.sleep) {
+      const h = parseSleepStr(d.sleep);
+      if (!isNaN(h)) {
+        const hrs = Math.floor(h), mins = Math.round((h-hrs)*60);
+        document.getElementById('sleep-val').value = mins>0 ? `${hrs}小时${mins}分` : h;
+        document.getElementById('sleep-unit').textContent = mins>0 ? '' : 'h';
+        saveDailyData('sleep', h);
+        updateSleep();
+      }
+    }
+  } catch(e) {}
+}
+
+fetchWorkerHealth();
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) fetchWorkerHealth();
 });
 renderCal();
 renderAllCats();
