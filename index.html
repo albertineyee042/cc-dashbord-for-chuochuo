@@ -457,11 +457,15 @@ function updateSteps() {
 function parseSleepStr(s) {
   if (!s) return NaN;
   s = String(s).trim();
+  // "10:10:00" HH:MM:SS 格式
+  const hms = s.match(/^(\d+):(\d{2}):(\d{2})$/);
+  if (hms) return parseInt(hms[1]) + parseInt(hms[2])/60 + parseInt(hms[3])/3600;
+  // "X小时X分钟"
   const hMatch = s.match(/(\d+)\s*小时/);
   const mMatch = s.match(/(\d+)\s*分/);
   if (hMatch || mMatch) return parseInt(hMatch?.[1]||0) + parseInt(mMatch?.[1]||0)/60;
   const n = parseFloat(s);
-  if (!isNaN(n) && n > 24) return n / 60; // 分钟数自动换算
+  if (!isNaN(n) && n > 24) return n / 60;
   return n;
 }
 
