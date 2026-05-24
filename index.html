@@ -847,7 +847,8 @@ function restoreToday() {
   if (d.steps) { document.getElementById('steps-val').value = d.steps; updateSteps(); }
   if (d.sleep) {
     const h = Math.floor(d.sleep), m = Math.round((d.sleep-h)*60);
-    document.getElementById('sleep-val').value = m>0 ? `${h}小时${m}分` : d.sleep;
+    document.getElementById('sleep-val').value = h;
+    document.getElementById('sleep-unit').textContent = m>0 ? `小时${m}分` : 'h';
     document.getElementById('sleep-unit').textContent = m>0 ? '' : 'h';
     updateSleep();
   }
@@ -886,7 +887,8 @@ async function fetchWorkerHealth() {
       const h = parseSleepStr(d.sleep);
       if (!isNaN(h)) {
         const hrs = Math.floor(h), mins = Math.round((h-hrs)*60);
-        document.getElementById('sleep-val').value = mins>0 ? `${hrs}小时${mins}分` : h;
+        document.getElementById('sleep-val').value = hrs;
+        document.getElementById('sleep-unit').textContent = mins>0 ? `小时${mins}分` : 'h';
         document.getElementById('sleep-unit').textContent = mins>0 ? '' : 'h';
         saveDailyData('sleep', h);
         updateSleep();
