@@ -767,13 +767,23 @@ async function parseScreenshot(input) {
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('未识别到有效数据');
     const parsed = JSON.parse(jsonMatch[0]);
+    console.log('GLM原始返回:', content);
+    console.log('解析结果:', JSON.stringify(parsed));
     const apps = parsed.apps || [];
     const fmtSec = s => {
       if (s < 60) return `${s}s`;
       const h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
       return h>0 ? `${h}h ${m}m` : `${m}m`;
     };
-    const parsedApps = apps.map(a => ({...a, seconds: Math.round(a.seconds||a.minutes*60||0)}));
+    const parseTimeStr = t => {
+      if (!t) return 0;
+      let s = 0;
+      const h = t.match(/(\d+)\s*(?:h|小时|时)/i); if (h) s += parseInt(h[1]) * 3600;
+      const m = t.match(/(\d+)\s*(?:m|分钟|分)/i); if (m) s += parseInt(m[1]) * 60;
+      const sc = t.match(/(\d+)\s*(?:s|秒)/i); if (sc) s += parseInt(sc[1]);
+      return s;
+    };
+    const parsedApps = apps.map(a => ({...a, seconds: a.time ? parseTimeStr(a.time) : Math.round(a.seconds||a.minutes*60||0)}));
     const totalSec = parsedApps.reduce((s,a)=>s+a.seconds,0);
     const screenData = {
       total: totalSec,
