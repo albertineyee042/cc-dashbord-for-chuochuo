@@ -724,6 +724,8 @@ function renderScreen() {
 
 // ========== 数据同步后自动消息 ==========
 async function autoGreet() {
+  const lastGreet = localStorage.getItem('lastAutoGreet');
+  if (lastGreet === todayStr) return;
   const cfg = JSON.parse(localStorage.getItem('chatConfig')||'{}');
   if (!cfg.key) return;
   const d = getDailyData(todayStr);
@@ -739,6 +741,7 @@ async function autoGreet() {
     const hist = JSON.parse(localStorage.getItem('chatHistory')||'[]');
     hist.push({role:'assistant', content: label + msg});
     localStorage.setItem('chatHistory', JSON.stringify(hist));
+    localStorage.setItem('lastAutoGreet', todayStr);
   } catch(e) {}
 }
 
