@@ -217,7 +217,7 @@
     <div class="section-label">体重</div>
     <div class="card">
       <div class="val-row">
-        <input class="editable big-num" id="weight-val" value="59.3" oninput="updateWeight()" style="width:110px">
+        <input class="editable big-num" id="weight-val" value="--" oninput="updateWeight()" style="width:110px">
         <span class="big-unit">kg</span>
         <span id="weight-arrow" style="font-size:13px;margin-left:8px"></span>
       </div>
@@ -248,7 +248,7 @@
     <div class="card">
       <div class="val-row">
         <input class="editable big-num" id="sleep-val" value="--" style="width:80px" oninput="updateSleep()">
-        <span class="big-unit">h</span>
+        <span class="big-unit" id="sleep-unit">h</span>
       </div>
       <div class="sleep-bar">
         <div>
@@ -454,8 +454,19 @@ function updateSteps() {
 }
 
 // 睡眠
+function parseSleepStr(s) {
+  if (!s) return NaN;
+  s = String(s).trim();
+  const hMatch = s.match(/(\d+)\s*小时/);
+  const mMatch = s.match(/(\d+)\s*分/);
+  if (hMatch || mMatch) return parseInt(hMatch?.[1]||0) + parseInt(mMatch?.[1]||0)/60;
+  const n = parseFloat(s);
+  if (!isNaN(n) && n > 24) return n / 60; // 分钟数自动换算
+  return n;
+}
+
 function updateSleep() {
-  const v = parseFloat(document.getElementById('sleep-val').value);
+  const v = parseSleepStr(document.getElementById('sleep-val').value);
   const tag = document.getElementById('sleep-tag');
   if (isNaN(v)) { tag.textContent='未填'; tag.className='sleep-tag'; return; }
   if (v>=7) { tag.textContent='睡眠充足'; tag.className='sleep-tag good'; }
@@ -682,7 +693,13 @@ function readUrlParams() {
   let hasData = false;
   Object.entries(map).forEach(([param, key]) => {
     const val = p.get(param);
-    if (val !== null) { saveDailyData(key, isNaN(val) ? val : Number(val)); hasData = true; }
+    if (val === null) return;
+    if (key === 'sleep') {
+      const h = parseSleepStr(val);
+      if (!isNaN(h)) { saveDailyData('sleep', h); hasData = true; }
+    } else {
+      saveDailyData(key, isNaN(val) ? val : Number(val)); hasData = true;
+    }
   });
   const screenParam = p.get('screen');
   if (screenParam) {
@@ -809,7 +826,12 @@ function restoreToday() {
   const d = getDailyData(todayStr);
   if (d.weight) { document.getElementById('weight-val').value = d.weight; updateWeight(); }
   if (d.steps) { document.getElementById('steps-val').value = d.steps; updateSteps(); }
-  if (d.sleep) { document.getElementById('sleep-val').value = d.sleep; updateSleep(); }
+  if (d.sleep) {
+    const h = Math.floor(d.sleep), m = Math.round((d.sleep-h)*60);
+    document.getElementById('sleep-val').value = m>0 ? `${h}小时${m}分` : d.sleep;
+    document.getElementById('sleep-unit').textContent = m>0 ? '' : 'h';
+    updateSleep();
+  }
   if (d.heart) document.getElementById('heart-val').value = d.heart;
   if (d.oxygen) document.getElementById('oxygen-val').value = d.oxygen;
   if (d.sleepStart) document.getElementById('sleep-start').value = d.sleepStart;
